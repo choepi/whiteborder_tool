@@ -1,7 +1,7 @@
 # White Border Tool by Choepi
 
 ## Overview
-The **White Border App** is a Python-based tool designed to preprocess images by:
+The **White Border Tool** is a Python-based tool designed to preprocess images by:
 1. Adding a white border to make them square.
 2. Overlaying metadata (camera, ISO, aperture, etc.) extracted from the image's EXIF data.
 
@@ -15,8 +15,8 @@ This tool processes all images in a specified input folder (`insta/01_pre`) and 
 
 ### Folder Structure
 Ensure the following folder structure exists alongside the `.exe`:
-
-your_app/
+```
+downloaded folder/
 ├── README.md            # The README file
 ├── insta_preprocess.exe # The executable
 └── insta/
@@ -24,7 +24,7 @@ your_app/
     ├── 02_post/         # Output folder for processed images
     └── font/            # Folder containing font files
         └── <font>.ttf   # Example font file
-
+```
 
 
 ---
