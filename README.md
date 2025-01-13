@@ -1,4 +1,4 @@
-# White Border App by Choepi
+# White Border Tool by Choepi
 
 ## Overview
 The **White Border App** is a Python-based tool designed to preprocess images by:
