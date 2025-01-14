@@ -1,0 +1,10 @@
+altgraph==0.17.4
+ExifRead @ file:///home/conda/feedstock_root/build_artifacts/exifread_1734851651388/work
+importlib_metadata==8.5.0
+packaging==24.2
+pefile==2023.2.7
+pillow @ file:///C:/b/abs_56j2irkr90/croot/pillow_1734430606717/work
+pyinstaller==6.11.1
+pyinstaller-hooks-contrib==2024.11
+pywin32-ctypes==0.2.3
+zipp==3.21.0
