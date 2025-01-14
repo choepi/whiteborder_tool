@@ -102,41 +102,57 @@ def extract_metadata(image_path):
     metadata = {}
     with open(image_path, 'rb') as f:
         tags = exifread.process_file(f, stop_tag="UNDEF", details=False)
+
+        # Camera Make and Model
         make = tags.get("Image Make", "Unknown")  # Camera manufacturer
         model = tags.get("Image Model", "Unknown")  # Camera model
         metadata["Camera"] = f"{make} {model}"
+                
+        # Lens Make and Model
+        lens_model = tags.get("EXIF LensModel", "Unknown")  # Lens model
+        metadata["Lens"] = f"{lens_model}"
+        print("#######")
+        print(lens_model)
+        # ISO
         metadata["ISO"] = tags.get("EXIF ISOSpeedRatings", "Unknown")
+        
+        # Aperture
         aperture_tag = tags.get("EXIF FNumber", None)
-        shutter_tag = tags.get("EXIF ExposureTime", None)
-        focal_length_tag = tags.get("EXIF FocalLength", None)
         if aperture_tag:
             try:
-                aperture_value = float(Fraction(str(aperture_tag)))  # Convert from Rational to float
-                metadata["Aperture"] = f"ƒ/{str(round(aperture_value, 1))}" # Round to 1 decimal place
+                aperture_value = float(Fraction(str(aperture_tag)))
+                metadata["Aperture"] = f"ƒ/{str(round(aperture_value, 1))}"
             except (ValueError, TypeError):
-                metadata["Aperture"] = "Unknown"  # Handle invalid or unconvertible value
+                metadata["Aperture"] = "Unknown"
         else:
             metadata["Aperture"] = "Unknown"
-        metadata["ShutterSpeed"] = f"{str((shutter_tag))}s"  # Shutter speed (Blendenzeit)
+        
+        # Shutter Speed
+        shutter_tag = tags.get("EXIF ExposureTime", None)
+        metadata["ShutterSpeed"] = f"{str(shutter_tag)}s" if shutter_tag else "Unknown"
+        
+        # Focal Length
+        focal_length_tag = tags.get("EXIF FocalLength", None)
         if focal_length_tag:
             try:
-                focal_length_value = float(Fraction(str(focal_length_tag)))  # Convert from Rational to float
-                metadata["FocalLength"] = f"{str(int(focal_length_value))}mm"  # Round to 1 decimal place
+                focal_length_value = float(Fraction(str(focal_length_tag)))
+                metadata["FocalLength"] = f"{str(int(focal_length_value))}mm"
             except (ValueError, TypeError):
-                metadata["FocalLength"] = "Unknown"  # Handle invalid or unconvertible value
+                metadata["FocalLength"] = "Unknown"
         else:
             metadata["FocalLength"] = "Unknown"
+    
     return metadata
-
 def format_metadata(metadata):
-    # Format metadata as a string to write on the image
     return (
         f"Camera: {metadata['Camera']}\n"
+        f"Lens: {metadata['Lens']}\n"
         f"ISO: {metadata['ISO']}\n"
         f"Aperture: {metadata['Aperture']}\n"
         f"Shutter Speed: {metadata['ShutterSpeed']}\n"
         f"Focal Length: {metadata['FocalLength']}"
     )
+
 
 def wrap_text(text, font, max_width):
     # This function wraps the text to fit within the given width
