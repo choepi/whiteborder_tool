@@ -22,6 +22,7 @@ TEXT_COLOR = (0, 0, 0)
 TREAT_SLASH_N_AS_NEWLINE = True  # turns 'n/' into newline (without touching '1/250s')
 OUTPUT_SIDE = 2160  # pick 1080 or 2160; must be same for all outputs
 
+
 # ===== CORE =====
 def make_square_and_add_metadata(folder_path, output_folder, font_path, DEBUG=DEBUG):
     os.makedirs(output_folder, exist_ok=True)
@@ -55,7 +56,7 @@ def make_square_and_add_metadata(folder_path, output_folder, font_path, DEBUG=DE
 
             # white borders
             b_left = px
-            b_bottom = S - (py + h)
+            b_bottom = S - (py + nh)
 
             # target box dims
             tgt_w = max(1, int(round(S * BOX_W_FRAC)))
