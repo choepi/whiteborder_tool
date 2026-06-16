@@ -1,75 +1,75 @@
 # White Border Tool by Choepi
 
 ## Overview
-The **White Border Tool** is a Python-based tool designed to preprocess images by:
-1. Adding a white border to make them square.
-2. Overlaying metadata (camera, ISO, aperture, etc.) extracted from the image's EXIF data.
 
-This tool processes all images in a specified input folder (`insta/01_pre`) and saves the processed images in an output folder (`insta/02_post`).
+The **White Border Tool** preprocesses images by:
+
+1. Adding a white square canvas.
+2. Fitting the photo above a reserved bottom metadata band, so text never covers the image.
+3. Adding model-only EXIF metadata at the bottom-left.
+4. Adding a normalized black brand mark at the bottom-right for Canon, Nikon, Sony, Fujifilm, and Samsung.
+
+Processed images are read from `insta/01_pre` and saved to `insta/02_post`.
 
 ---
 
 ## Requirements
-- Windows operating system (the `.exe` is built for Windows).
+
+- Windows operating system if you use the bundled `.exe`.
 - The `insta` folder must be in the same directory as the `.exe` file.
+- The Python script requires Pillow. It can use ExifRead when installed, but falls back to Pillow EXIF parsing.
 
 ### Folder Structure
-Ensure the following folder structure exists alongside the `.exe`:
-```
-downloaded folder/
-├── README.md            # The README file
-├── insta_preprocess.exe # The executable
-└── insta/
-    ├── 01_pre/          # Input folder for images (add images here)
-    ├── 02_post/         # Output folder for processed images
-    └── font/            # Folder containing font files
-        └── <font>.ttf   # Example font file
-```
 
+Ensure this structure exists alongside the `.exe`:
+
+```text
+downloaded folder/
+|-- README.md
+|-- insta_preprocess.exe
+|-- insta/
+    |-- 01_pre/          # Input images
+    |-- 02_post/         # Processed output images
+    |-- brand_marks/     # Black PNG brand marks
+    |-- font/
+        |-- <font>.ttf
+```
 
 ---
 
 ## Usage
 
-1. **Prepare Input Files:**
-   - Place all images you want to process in the `insta/01_pre` folder.
-   - Supported formats: `.jpg`, `.jpeg`, `.png`.
-
-2. **Run the Tool:**
-   - Double-click `insta_preprocess.exe` to start processing.
-   - A console window will show the progress of each file.
-
-3. **View Results:**
-   - Processed images with white borders and metadata will be saved in `insta/02_post`.
+1. Place `.jpg`, `.jpeg`, or `.png` files in `insta/01_pre`.
+2. Run `insta_preprocess.exe`, or run `insta_preprocess.py` with Python.
+3. Processed square images are saved in `insta/02_post`.
 
 ---
 
 ## Troubleshooting
 
-1. **Font Error**:
-   - Ensure the `font` folder contains at least one `.ttf` file.
-   - If the font file is missing or corrupt, the app will throw an error.
+1. **Font Error**
+   - Ensure `insta/font` contains the expected `.ttf` file.
 
-2. **Input Folder Not Found**:
-   - Ensure the `01_pre` folder exists inside the `insta` directory.
-   - If the folder is missing, create it and add your images.
+2. **Input Folder Not Found**
+   - Ensure `insta/01_pre` exists and contains images.
 
-3. **Output Folder Issues**:
-   - If the `02_post` folder does not exist, the app will create it automatically.
-   - Check the console for saved file paths.
+3. **Output Folder Issues**
+   - If `insta/02_post` does not exist, the app creates it.
 
-4. **EXIF Metadata Missing**:
-   - If some metadata fields (e.g., ISO, aperture) are missing, the app will use "Unknown" as a placeholder.
+4. **EXIF Metadata Missing**
+   - Missing fields are shown as `Unknown`.
+   - If a camera brand cannot be recognized, no brand mark is drawn.
 
 ---
 
 ## Notes
-- Large images may take longer to process.
-- This app does not modify the original files in the `01_pre` folder.
-- If you encounter unexpected issues, ensure your input images have proper EXIF data or contact the developer.
+
+- The original files in `insta/01_pre` are not modified.
+- Brand mark PNGs are normalized to the same canvas size for consistent bottom-right placement.
+- If brand mark files are missing, the script can regenerate them from the configured font.
 
 ---
 
 ## Credits
-Developed by **Choepi**.
 
+Developed by **Choepi**.

@@ -1,12 +1,18 @@
-import os, math
-from PIL import Image, ImageDraw, ImageFont
-import exifread
+import os
 from fractions import Fraction
+from pathlib import Path
+
+from PIL import Image, ImageDraw, ImageFont
+
 
 # ===== TUNABLES =====
-BOX_W_FRAC = 0.16
-BOX_H_FRAC = 0.18
-PADDING_RATIO = 0.06
+OUTPUT_SIDE = 2160  # pick 1080 or 2160; must be same for all outputs
+
+FOOTER_H_FRAC = 0.18
+EDGE_PADDING_FRAC = 0.035
+TEXT_LOGO_GAP_FRAC = 0.035
+BRAND_MARK_W_FRAC = 0.22
+BRAND_MARK_H_FRAC = 0.065
 
 MIN_FONT_PX = 20
 MAX_FONT_PX = 30
@@ -15,17 +21,34 @@ STRICT_LOCK = True
 
 LINE_GAP_RATIO = 0.12
 MIN_LINE_GAP_PX = 1
-OVERLAY_ALPHA = 255
-DEBUG = True
-
 TEXT_COLOR = (0, 0, 0)
 TREAT_SLASH_N_AS_NEWLINE = True  # turns 'n/' into newline (without touching '1/250s')
-OUTPUT_SIDE = 2160  # pick 1080 or 2160; must be same for all outputs
+DEBUG = True
+
+BRAND_MARK_DIR = Path("insta") / "brand_marks"
+BRAND_MARK_CANVAS = (600, 180)
+SUPPORTED_BRANDS = {
+    "canon": ("CANON", ("canon", "eos")),
+    "nikon": ("NIKON", ("nikon", "nikkor")),
+    "sony": ("SONY", ("sony", "ilce", "dslr-a", "zv-")),
+    "fujifilm": ("FUJIFILM", ("fujifilm", "fuji", "x-t", "x-pro", "x100", "gfx")),
+    "samsung": ("SAMSUNG", ("samsung", "galaxy")),
+}
+
+try:
+    RESAMPLE_LANCZOS = Image.Resampling.LANCZOS
+except AttributeError:
+    RESAMPLE_LANCZOS = Image.LANCZOS
 
 
 # ===== CORE =====
 def make_square_and_add_metadata(folder_path, output_folder, font_path, DEBUG=DEBUG):
     os.makedirs(output_folder, exist_ok=True)
+    try:
+        ensure_brand_mark_assets(font_path)
+    except OSError:
+        pass
+
     files = [
         f
         for f in os.listdir(folder_path)
@@ -40,113 +63,32 @@ def make_square_and_add_metadata(folder_path, output_folder, font_path, DEBUG=DE
         with Image.open(fp) as img:
             img = img.convert("RGB")
             w, h = img.size
-            S_raw = max(w, h)
+            footer_h = footer_height(OUTPUT_SIDE)
+            image_rect = fit_image_rect(w, h, OUTPUT_SIDE, footer_h)
 
-            # normalize to fixed output side
-            S = OUTPUT_SIDE  # use this S for ALL subsequent math
-            scale = S / float(S_raw)
-            nw, nh = max(1, int(round(w * scale))), max(1, int(round(h * scale)))
+            square = Image.new("RGB", (OUTPUT_SIDE, OUTPUT_SIDE), (255, 255, 255))
+            resized = img.resize(
+                (image_rect[2] - image_rect[0], image_rect[3] - image_rect[1]),
+                RESAMPLE_LANCZOS,
+            )
+            square.paste(resized, image_rect[:2])
 
-            img_resized = img.resize((nw, nh), Image.LANCZOS)
-
-            # square canvas + center (normalized space)
-            square = Image.new("RGB", (S, S), (255, 255, 255))
-            px, py = (S - nw) // 2, (S - nh) // 2
-            square.paste(img_resized, (px, py))
-
-            # white borders
-            b_left = px
-            b_bottom = S - (py + nh)
-
-            # target box dims
-            tgt_w = max(1, int(round(S * BOX_W_FRAC)))
-            tgt_h = max(1, int(round(S * BOX_H_FRAC)))
-
-            # metadata text (with hard newlines)
             meta = extract_metadata(fp)
             text = normalize_newlines(format_metadata(meta))
-
-            # locked font
-            base_px = (
-                clamp(int(LOCK_FONT_PX), MIN_FONT_PX, MAX_FONT_PX)
-                if LOCK_FONT_PX
-                else MIN_FONT_PX
-            )
-            font = ImageFont.truetype(font_path, base_px)
-
-            # find a bottom-left rect that fits THIS font by stretching along free axis
-            rect, mode = choose_rect_strict(
-                text, font, S, b_left, b_bottom, tgt_w, tgt_h, PADDING_RATIO
-            )
+            brand = resolve_brand(meta.get("Make"), meta.get("Model"))
+            text_rect, brand_rect = metadata_regions(OUTPUT_SIDE, footer_h, bool(brand))
 
             draw = ImageDraw.Draw(square)
-            if mode == "overlay":
-                draw_overlay_rect(square, rect, OVERLAY_ALPHA)
-                draw = ImageDraw.Draw(square)
-
-            # final inner box with SAME padding math
-            x0, y0, x1, y1 = rect
-            box_w, box_h = x1 - x0, y1 - y0
-            pad_x = max(4, int(round(box_w * PADDING_RATIO)))
-            pad_y = max(4, int(round(box_h * PADDING_RATIO)))
-            inner = (x0 + pad_x, y0 + pad_y, x1 - pad_x, y1 - pad_y)
-            inner_w = max(1, inner[2] - inner[0])
-            inner_h = max(1, inner[3] - inner[1])
-
-            # layout with uniform line height
-            lines = wrap_text_preserve_newlines(text, font, inner_w)
-            lh = uniform_line_height(font)
-            total_h = lh * len(lines)
-            if DEBUG:
-                print(
-                    f"\n[{fn}] mode={mode} S={S} bL={b_left} bB={b_bottom} "
-                    f"rect=({x0},{y0},{x1},{y1}) box=({box_w}x{box_h}) "
-                    f"inner=({inner_w}x{inner_h}) font={font.size} lines={len(lines)}"
-                )
-            if total_h > inner_h:
-                if STRICT_LOCK:
-                    # if somehow still overflowing (should be rare), expand overlay taller to keep font
-                    if mode != "overlay":
-                        # switch to overlay sized to fit
-                        need_h = total_h + 2 * max(
-                            4, int(round((total_h + 2) * PADDING_RATIO))
-                        )
-                        need_h = min(S, int(math.ceil(need_h)))
-                        rect = (0, S - need_h, max(tgt_w, box_w), S)
-                        draw_overlay_rect(square, rect, OVERLAY_ALPHA)
-                        draw = ImageDraw.Draw(square)
-                        # recompute inner
-                        x0, y0, x1, y1 = rect
-                        box_w, box_h = x1 - x0, y1 - y0
-                        pad_x = max(4, int(round(box_w * PADDING_RATIO)))
-                        pad_y = max(4, int(round(box_h * PADDING_RATIO)))
-                        inner = (x0 + pad_x, y0 + pad_y, x1 - pad_x, y1 - pad_y)
-                        inner_w = max(1, inner[2] - inner[0])
-                        inner_h = max(1, inner[3] - inner[1])
-                        lines = wrap_text_preserve_newlines(text, font, inner_w)
-                        lh = uniform_line_height(font)
-                        total_h = lh * len(lines)
-                else:
-                    # softly step down, but only if not strict
-                    while total_h > inner_h and font.size > MIN_FONT_PX:
-                        font = ImageFont.truetype(font_path, font.size - 1)
-                        lines = wrap_text_preserve_newlines(text, font, inner_w)
-                        lh = uniform_line_height(font)
-                        total_h = lh * len(lines)
-
-            # draw bottom-left inside inner
-            start_x = inner[0]
-            start_y = inner[3] - total_h
-            y = start_y
-            for ln in lines:
-                draw.text((start_x, y), ln, fill=TEXT_COLOR, font=font)
-                y += lh
+            font, lines, line_h = fit_text(text, font_path, text_rect)
+            draw_text_bottom_left(draw, text_rect, lines, font, line_h)
+            if brand:
+                draw_brand_mark(square, brand, brand_rect, font_path)
 
             if DEBUG:
                 print(
-                    f"\n[{fn}] mode={mode} S={S} bL={b_left} bB={b_bottom} "
-                    f"rect=({x0},{y0},{x1},{y1}) box=({box_w}x{box_h}) "
-                    f"inner=({inner_w}x{inner_h}) font={font.size} lines={len(lines)}"
+                    f"\n[{fn}] S={OUTPUT_SIDE} footer={footer_h} "
+                    f"image={image_rect} text={text_rect} brand={brand}:{brand_rect} "
+                    f"font={getattr(font, 'size', LOCK_FONT_PX)} lines={len(lines)}"
                 )
 
             out = os.path.join(output_folder, f"{os.path.splitext(fn)[0]}_insta.jpg")
@@ -154,110 +96,84 @@ def make_square_and_add_metadata(folder_path, output_folder, font_path, DEBUG=DE
             print(f"Processed and saved: {out}")
 
 
-# ===== FITTING GEOMETRY (strict, consistent padding) =====
-def choose_rect_strict(text, font, S, b_left, b_bottom, tgt_w, tgt_h, pad_ratio):
+# ===== GEOMETRY =====
+def footer_height(side):
+    return clamp(int(round(side * FOOTER_H_FRAC)), 1, side - 1)
+
+
+def fit_image_rect(width, height, side, footer_h):
     """
-    Try LEFT-border mode (width <= b_left, grow height) and BOTTOM-border mode
-    (height <= b_bottom, grow width) with EXACT same padding math used later.
-    Pick the first that fits; prefer BOTTOM if both fit (usually cleaner). If neither border exists -> overlay.
+    Fit the source image inside the square area above the footer.
+
+    The footer is reserved before the image is resized, so text/logo drawing can
+    never cover real image pixels. This replaces the old orientation-specific
+    border picker that sometimes fell back to drawing a white overlay on top of
+    the photo.
     """
-    candidates = []
+    if width <= 0 or height <= 0:
+        raise ValueError("image dimensions must be positive")
 
-    # LEFT mode: clamp width to min(tgt_w, b_left). grow height until text fits.
-    if b_left > 0:
-        w = min(tgt_w, b_left)
-        rect = grow_height_to_fit_consistent(text, font, S, w, tgt_h, pad_ratio)
-        if rect is not None:
-            candidates.append(("left", rect))
-
-    # BOTTOM mode: clamp height to min(tgt_h, b_bottom). grow width until text fits.
-    if b_bottom > 0:
-        h = min(tgt_h, b_bottom)
-        rect = grow_width_to_fit_consistent(text, font, S, tgt_w, h, pad_ratio)
-        if rect is not None:
-            candidates.append(("bottom", rect))
-
-    if not candidates:
-        # no border: overlay sized minimally to fit at locked font
-        rect = minimal_overlay_to_fit(text, font, S, tgt_w, tgt_h, pad_ratio)
-        return rect, "overlay"
-
-    # prefer bottom if both fit; else pick the one that fits
-    if (
-        len(candidates) == 2
-        and candidates[0][0] != "bottom"
-        and candidates[1][0] == "bottom"
-    ):
-        return candidates[1][1], "bottom"
-    return candidates[0][1], candidates[0][0]
+    image_area_h = side - footer_h
+    scale = min(side / float(width), image_area_h / float(height))
+    new_w = max(1, int(round(width * scale)))
+    new_h = max(1, int(round(height * scale)))
+    x0 = (side - new_w) // 2
+    y0 = (image_area_h - new_h) // 2
+    return (x0, y0, x0 + new_w, y0 + new_h)
 
 
-def grow_height_to_fit_consistent(text, font, S, box_w, min_h, pad_ratio):
-    # padding uses final box size (consistent)
-    # we increase box_h until inner_h >= total_h
-    box_h = max(1, min_h)
-    while True:
-        pad_x = max(4, int(round(box_w * pad_ratio)))
-        pad_y = max(4, int(round(box_h * pad_ratio)))
-        inner_w = max(1, box_w - 2 * pad_x)
-        inner_h = max(1, box_h - 2 * pad_y)
-        lines = wrap_text_preserve_newlines(text, font, inner_w)
-        total_h = uniform_line_height(font) * len(lines)
-        if total_h <= inner_h:  # fits!
-            break
-        new_h = min(S, int(math.ceil(total_h + 2 * pad_y)))
-        if new_h == box_h:  # cannot grow further
-            return None
-        box_h = new_h
-        if box_h >= S:
-            # one last pass with S
-            pad_y = max(4, int(round(box_h * pad_ratio)))
-            inner_h = max(1, box_h - 2 * pad_y)
-            if total_h <= inner_h:
-                break
-            return None
-    x0, y0 = 0, S - box_h
-    return (x0, y0, x0 + box_w, y0 + box_h)
+def metadata_regions(side, footer_h, include_brand):
+    footer_top = side - footer_h
+    pad = max(12, int(round(side * EDGE_PADDING_FRAC)))
+    gap = max(12, int(round(side * TEXT_LOGO_GAP_FRAC)))
 
+    brand_rect = None
+    text_right = side - pad
+    if include_brand:
+        mark_w = max(1, int(round(side * BRAND_MARK_W_FRAC)))
+        mark_h = max(1, int(round(side * BRAND_MARK_H_FRAC)))
+        brand_rect = (side - pad - mark_w, side - pad - mark_h, side - pad, side - pad)
+        text_right = max(pad + 1, brand_rect[0] - gap)
 
-def grow_width_to_fit_consistent(text, font, S, min_w, box_h, pad_ratio):
-    # binary search width until inner_w makes lines fit within fixed inner_h
-    lo = max(1, min_w)
-    hi = S
-    ok = None
-    while lo <= hi:
-        mid = (lo + hi) // 2
-        pad_x = max(4, int(round(mid * pad_ratio)))
-        pad_y = max(4, int(round(box_h * pad_ratio)))
-        inner_w = max(1, mid - 2 * pad_x)
-        inner_h = max(1, box_h - 2 * pad_y)
-        lines = wrap_text_preserve_newlines(text, font, inner_w)
-        total_h = uniform_line_height(font) * len(lines)
-        if total_h <= inner_h:
-            ok = mid
-            hi = mid - 1
-        else:
-            lo = mid + 1
-    if ok is None:
-        return None
-    x0, y0 = 0, S - box_h
-    return (x0, y0, x0 + ok, y0 + box_h)
-
-
-def minimal_overlay_to_fit(text, font, S, tgt_w, tgt_h, pad_ratio):
-    # prefer target height, grow width first; if still not, grow height
-    rect = grow_width_to_fit_consistent(text, font, S, tgt_w, tgt_h, pad_ratio)
-    if rect is not None:
-        return rect
-    return grow_height_to_fit_consistent(text, font, S, tgt_w, tgt_h, pad_ratio) or (
-        0,
-        S - tgt_h,
-        S,
-        S,
-    )
+    text_rect = (pad, footer_top + pad, text_right, side - pad)
+    return text_rect, brand_rect
 
 
 # ===== TEXT LAYOUT =====
+def fit_text(text, font_path, rect):
+    inner_w = max(1, rect[2] - rect[0])
+    inner_h = max(1, rect[3] - rect[1])
+    locked_size = clamp(int(LOCK_FONT_PX), MIN_FONT_PX, MAX_FONT_PX)
+
+    font = load_font(font_path, locked_size)
+    lines = wrap_text_preserve_newlines(text, font, inner_w)
+    line_h = uniform_line_height(font)
+    if STRICT_LOCK and line_h * len(lines) <= inner_h:
+        return font, lines, line_h
+
+    for size in range(min(locked_size, MAX_FONT_PX), MIN_FONT_PX - 1, -1):
+        font = load_font(font_path, size)
+        lines = wrap_text_preserve_newlines(text, font, inner_w)
+        line_h = uniform_line_height(font)
+        if line_h * len(lines) <= inner_h:
+            return font, lines, line_h
+
+    font = load_font(font_path, MIN_FONT_PX)
+    line_h = uniform_line_height(font)
+    max_lines = max(1, inner_h // line_h)
+    lines = wrap_text_preserve_newlines(text, font, inner_w, max_lines=max_lines)
+    return font, lines, line_h
+
+
+def draw_text_bottom_left(draw, rect, lines, font, line_h):
+    total_h = line_h * len(lines)
+    x = rect[0]
+    y = rect[3] - total_h
+    for line in lines:
+        draw.text((x, y), line, fill=TEXT_COLOR, font=font)
+        y += line_h
+
+
 def normalize_newlines(text: str) -> str:
     t = text.replace("\r\n", "\n").replace("\r", "\n").replace("\\n", "\n")
     if TREAT_SLASH_N_AS_NEWLINE:
@@ -268,111 +184,267 @@ def normalize_newlines(text: str) -> str:
 
 
 def wrap_text_preserve_newlines(text, font, max_w, max_lines=None):
-    out, used = [], 0
+    out = []
     for para in text.split("\n"):
-        if max_lines and used >= max_lines:
+        if max_lines and len(out) >= max_lines:
             break
         if para == "":
             out.append("")
-            used += 1
             continue
-        words, cur = para.split(" "), ""
-        for w in words:
-            test = w if not cur else cur + " " + w
-            width = font.getbbox(test)[2] - font.getbbox(test)[0]
-            if width <= max_w:
-                cur = test
-            else:
+
+        cur = ""
+        for word in para.split(" "):
+            pieces = split_token_to_width(word, font, max_w)
+            for piece in pieces:
+                candidate = piece if not cur else f"{cur} {piece}"
+                if text_width(font, candidate) <= max_w:
+                    cur = candidate
+                    continue
+
                 if cur:
                     out.append(cur)
-                    used += 1
-                    if max_lines and used >= max_lines:
-                        cur = ""
-                        break
-                cur = w
-        if cur and (not max_lines or used < max_lines):
+                    if max_lines and len(out) >= max_lines:
+                        return out
+                cur = piece
+
+        if cur:
             out.append(cur)
-            used += 1
-    return out
+
+    return out[:max_lines] if max_lines else out
+
+
+def split_token_to_width(token, font, max_w):
+    if text_width(font, token) <= max_w:
+        return [token]
+
+    chunks = []
+    cur = ""
+    for char in token:
+        candidate = cur + char
+        if cur and text_width(font, candidate) > max_w:
+            chunks.append(cur)
+            cur = char
+        else:
+            cur = candidate
+    if cur:
+        chunks.append(cur)
+    return chunks
+
+
+def text_width(font, text):
+    bbox = font.getbbox(text)
+    return bbox[2] - bbox[0]
 
 
 def uniform_line_height(font):
-    ascent, descent = font.getmetrics()
-    gap = max(MIN_LINE_GAP_PX, int(round(font.size * LINE_GAP_RATIO)))
+    try:
+        ascent, descent = font.getmetrics()
+        size = font.size
+    except AttributeError:
+        bbox = font.getbbox("Ag")
+        ascent, descent = bbox[3] - bbox[1], 0
+        size = max(1, ascent)
+    gap = max(MIN_LINE_GAP_PX, int(round(size * LINE_GAP_RATIO)))
     return ascent + descent + gap
 
 
+def load_font(font_path, size):
+    try:
+        return ImageFont.truetype(font_path, size)
+    except OSError:
+        return ImageFont.load_default()
+
+
+# ===== BRAND MARKS =====
+def ensure_brand_mark_assets(font_path, asset_dir=BRAND_MARK_DIR):
+    asset_dir = Path(asset_dir)
+    asset_dir.mkdir(parents=True, exist_ok=True)
+    for brand in SUPPORTED_BRANDS:
+        path = asset_dir / f"{brand}.png"
+        if not path.exists():
+            generate_brand_mark_image(brand, font_path).save(path)
+
+
+def draw_brand_mark(square, brand, rect, font_path, asset_dir=BRAND_MARK_DIR):
+    mark = load_brand_mark(brand, font_path, asset_dir)
+    mark = mark.resize((rect[2] - rect[0], rect[3] - rect[1]), RESAMPLE_LANCZOS)
+    square.paste(mark, rect[:2], mark)
+
+
+def load_brand_mark(brand, font_path, asset_dir=BRAND_MARK_DIR):
+    path = Path(asset_dir) / f"{brand}.png"
+    if path.exists():
+        return Image.open(path).convert("RGBA")
+    return generate_brand_mark_image(brand, font_path)
+
+
+def generate_brand_mark_image(brand, font_path, canvas_size=BRAND_MARK_CANVAS):
+    label = SUPPORTED_BRANDS.get(brand, (brand.upper(), ()))[0]
+    img = Image.new("RGBA", canvas_size, (255, 255, 255, 0))
+    draw = ImageDraw.Draw(img)
+    font_size = int(canvas_size[1] * 0.54)
+    font = load_font(font_path, font_size)
+
+    while text_width(font, label) > canvas_size[0] * 0.86 and font_size > 10:
+        font_size -= 2
+        font = load_font(font_path, font_size)
+
+    bbox = draw.textbbox((0, 0), label, font=font)
+    x = (canvas_size[0] - (bbox[2] - bbox[0])) // 2 - bbox[0]
+    y = (canvas_size[1] - (bbox[3] - bbox[1])) // 2 - bbox[1]
+    draw.text((x, y), label, fill=(0, 0, 0, 255), font=font)
+    return img
+
+
+def resolve_brand(make, model):
+    haystack = f"{make or ''} {model or ''}".lower()
+    for brand, (_, needles) in SUPPORTED_BRANDS.items():
+        if any(needle in haystack for needle in needles):
+            return brand
+    return None
+
+
 # ===== EXIF + FORMAT =====
+def unknown_metadata():
+    return {
+        "Make": "Unknown",
+        "Model": "Unknown",
+        "ISO": "Unknown",
+        "Aperture": "Unknown",
+        "Shutter Speed": "Unknown",
+        "Focal Length": "Unknown",
+    }
+
+
 def extract_metadata(image_path):
-    md = {}
-    with open(image_path, "rb") as f:
-        tags = exifread.process_file(f, stop_tag="UNDEF", details=False)
-    make = str(tags.get("Image Make", "Unknown")).strip()
-    model = str(tags.get("Image Model", "Unknown")).strip()
-    md["Camera"] = f"{make} {model}".strip()
+    try:
+        import exifread
+    except ModuleNotFoundError:
+        return extract_metadata_with_pillow(image_path)
+
+    try:
+        with open(image_path, "rb") as f:
+            tags = exifread.process_file(f, stop_tag="UNDEF", details=False)
+        return metadata_from_exifread_tags(tags)
+    except Exception:
+        return extract_metadata_with_pillow(image_path)
+
+
+def metadata_from_exifread_tags(tags):
+    md = unknown_metadata()
+    md["Make"] = clean_metadata_value(tags.get("Image Make"))
+    md["Model"] = clean_metadata_value(tags.get("Image Model"))
+
     iso = (
         tags.get("EXIF ISOSpeedRatings")
         or tags.get("EXIF PhotographicSensitivity")
         or "Unknown"
     )
-    md["ISO"] = str(iso)
-    ap = tags.get("EXIF FNumber")
-    if ap:
-        try:
-            md["Aperture"] = f"ƒ/{round(float(Fraction(str(ap))), 1)}"
-        except Exception:
-            md["Aperture"] = "Unknown"
-    else:
-        md["Aperture"] = "Unknown"
-    sh = tags.get("EXIF ExposureTime")
-    if sh:
-        try:
-            val = float(Fraction(str(sh)))
-            md["Shutter Speed"] = (
-                f"{round(val,1)}s" if val >= 1 else f"1/{int(round(1/val))}s"
-            )
-        except Exception:
-            md["Shutter Speed"] = f"{str(sh)}s"
-    else:
-        md["Shutter Speed"] = "Unknown"
-    fl = tags.get("EXIF FocalLength")
-    if fl:
-        try:
-            v = float(Fraction(str(fl)))
-            md["Focal Length"] = (
-                f"{int(round(v))}mm" if abs(v - round(v)) < 0.1 else f"{round(v,1)}mm"
-            )
-        except Exception:
-            md["Focal Length"] = "Unknown"
-    else:
-        md["Focal Length"] = "Unknown"
+    md["ISO"] = clean_metadata_value(iso)
+
+    aperture = tags.get("EXIF FNumber")
+    if aperture:
+        md["Aperture"] = format_aperture(aperture)
+
+    shutter = tags.get("EXIF ExposureTime")
+    if shutter:
+        md["Shutter Speed"] = format_shutter_speed(shutter)
+
+    focal_length = tags.get("EXIF FocalLength")
+    if focal_length:
+        md["Focal Length"] = format_focal_length(focal_length)
+
     return md
+
+
+def extract_metadata_with_pillow(image_path):
+    with Image.open(image_path) as img:
+        return metadata_from_pillow_exif(img.getexif())
+
+
+def metadata_from_pillow_exif(exif):
+    md = unknown_metadata()
+    md["Make"] = clean_metadata_value(pillow_exif_value(exif, 271))
+    md["Model"] = clean_metadata_value(pillow_exif_value(exif, 272))
+    md["ISO"] = clean_metadata_value(pillow_exif_value(exif, 34855))
+    md["Aperture"] = format_aperture(pillow_exif_value(exif, 33437))
+    md["Shutter Speed"] = format_shutter_speed(pillow_exif_value(exif, 33434))
+    md["Focal Length"] = format_focal_length(pillow_exif_value(exif, 37386))
+    return md
+
+
+def pillow_exif_value(exif, tag):
+    value = exif.get(tag)
+    if value is not None:
+        return value
+
+    get_ifd = getattr(exif, "get_ifd", None)
+    if not get_ifd:
+        return None
+
+    try:
+        return get_ifd(34665).get(tag)
+    except Exception:
+        return None
+
+
+def clean_metadata_value(value):
+    if value is None:
+        return "Unknown"
+    text = str(value).strip()
+    return text if text else "Unknown"
+
+
+def rational_float(value):
+    if value is None:
+        raise ValueError("missing value")
+    if isinstance(value, tuple) and len(value) == 2:
+        return float(value[0]) / float(value[1])
+    try:
+        return float(Fraction(str(value)))
+    except Exception:
+        return float(value)
+
+
+def format_aperture(value):
+    try:
+        return f"f/{round(rational_float(value), 1)}"
+    except Exception:
+        return "Unknown"
+
+
+def format_shutter_speed(value):
+    try:
+        val = rational_float(value)
+        if val <= 0:
+            return "Unknown"
+        return f"{round(val, 1)}s" if val >= 1 else f"1/{int(round(1 / val))}s"
+    except Exception:
+        text = clean_metadata_value(value)
+        return "Unknown" if text == "Unknown" else f"{text}s"
+
+
+def format_focal_length(value):
+    try:
+        val = rational_float(value)
+        return f"{int(round(val))}mm" if abs(val - round(val)) < 0.1 else f"{round(val, 1)}mm"
+    except Exception:
+        return "Unknown"
 
 
 def format_metadata(md):
     return (
-        f"Camera: {md['Camera']}\n"
-        f"ISO: {md['ISO']}\n"
-        f"Aperture: {md['Aperture']}\n"
-        f"Shutter Speed: {md['Shutter Speed']}\n"
-        f"Focal Length: {md['Focal Length']}"
+        f"Model: {md.get('Model', 'Unknown')}\n"
+        f"ISO: {md.get('ISO', 'Unknown')}\n"
+        f"Aperture: {md.get('Aperture', 'Unknown')}\n"
+        f"Shutter Speed: {md.get('Shutter Speed', 'Unknown')}\n"
+        f"Focal Length: {md.get('Focal Length', 'Unknown')}"
     )
 
 
 # ===== utils =====
 def clamp(v, lo, hi):
     return max(lo, min(v, hi))
-
-
-def draw_overlay_rect(img, rect, alpha):
-    if img.mode != "RGBA":
-        base = img.convert("RGBA")
-    else:
-        base = img.copy()
-    overlay = Image.new("RGBA", base.size, (0, 0, 0, 0))
-    ImageDraw.Draw(overlay).rectangle(rect, fill=(255, 255, 255, alpha))
-    composed = Image.alpha_composite(base, overlay).convert("RGB")
-    img.paste(composed)
 
 
 # ===== CLI =====
