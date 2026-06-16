@@ -33,12 +33,22 @@ class LayoutTests(unittest.TestCase):
         footer_top = side - footer_h
 
         text_rect, brand_rect = tool.metadata_regions(side, footer_h, include_brand=True)
+        brand_w = brand_rect[2] - brand_rect[0]
+        brand_h = brand_rect[3] - brand_rect[1]
 
         self.assertGreaterEqual(text_rect[0], 0)
         self.assertGreaterEqual(text_rect[1], footer_top)
         self.assertEqual(text_rect[3], brand_rect[3])
         self.assertLess(text_rect[2], brand_rect[0])
         self.assertEqual(brand_rect[2], side - text_rect[0])
+        self.assertEqual(brand_w, int(round(side * tool.BRAND_MARK_W_FRAC)))
+        self.assertEqual(brand_h, int(round(side * tool.BRAND_MARK_H_FRAC)))
+        self.assertLess(brand_w, int(round(side * 0.22)))
+        self.assertLess(brand_h, int(round(side * 0.065)))
+
+    def test_output_canvas_is_square(self):
+        self.assertEqual(tool.OUTPUT_SIDE, 2160)
+        self.assertEqual((tool.OUTPUT_SIDE, tool.OUTPUT_SIDE), (2160, 2160))
 
     def test_format_metadata_uses_model_only(self):
         text = tool.format_metadata(
