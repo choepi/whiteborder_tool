@@ -65,8 +65,8 @@ downloaded folder/
 ## Notes
 
 - The original files in `insta/01_pre` are not modified.
-- Brand mark PNGs are normalized to the same canvas size for consistent bottom-right placement.
-- If brand mark files are missing, the script can regenerate them from the configured font.
+- Brand mark PNGs are original logo-derived assets normalized to the same canvas size for consistent bottom-right placement.
+- If a recognized brand mark file is missing, the script raises an error instead of generating a replacement.
 
 ---
 

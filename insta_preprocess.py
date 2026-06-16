@@ -44,10 +44,6 @@ except AttributeError:
 # ===== CORE =====
 def make_square_and_add_metadata(folder_path, output_folder, font_path, DEBUG=DEBUG):
     os.makedirs(output_folder, exist_ok=True)
-    try:
-        ensure_brand_mark_assets(font_path)
-    except OSError:
-        pass
 
     files = [
         f
@@ -82,7 +78,7 @@ def make_square_and_add_metadata(folder_path, output_folder, font_path, DEBUG=DE
             font, lines, line_h = fit_text(text, font_path, text_rect)
             draw_text_bottom_left(draw, text_rect, lines, font, line_h)
             if brand:
-                draw_brand_mark(square, brand, brand_rect, font_path)
+                draw_brand_mark(square, brand, brand_rect)
 
             if DEBUG:
                 print(
@@ -256,44 +252,17 @@ def load_font(font_path, size):
 
 
 # ===== BRAND MARKS =====
-def ensure_brand_mark_assets(font_path, asset_dir=BRAND_MARK_DIR):
-    asset_dir = Path(asset_dir)
-    asset_dir.mkdir(parents=True, exist_ok=True)
-    for brand in SUPPORTED_BRANDS:
-        path = asset_dir / f"{brand}.png"
-        if not path.exists():
-            generate_brand_mark_image(brand, font_path).save(path)
-
-
-def draw_brand_mark(square, brand, rect, font_path, asset_dir=BRAND_MARK_DIR):
-    mark = load_brand_mark(brand, font_path, asset_dir)
+def draw_brand_mark(square, brand, rect, asset_dir=BRAND_MARK_DIR):
+    mark = load_brand_mark(brand, asset_dir)
     mark = mark.resize((rect[2] - rect[0], rect[3] - rect[1]), RESAMPLE_LANCZOS)
     square.paste(mark, rect[:2], mark)
 
 
-def load_brand_mark(brand, font_path, asset_dir=BRAND_MARK_DIR):
+def load_brand_mark(brand, asset_dir=BRAND_MARK_DIR):
     path = Path(asset_dir) / f"{brand}.png"
-    if path.exists():
-        return Image.open(path).convert("RGBA")
-    return generate_brand_mark_image(brand, font_path)
-
-
-def generate_brand_mark_image(brand, font_path, canvas_size=BRAND_MARK_CANVAS):
-    label = SUPPORTED_BRANDS.get(brand, (brand.upper(), ()))[0]
-    img = Image.new("RGBA", canvas_size, (255, 255, 255, 0))
-    draw = ImageDraw.Draw(img)
-    font_size = int(canvas_size[1] * 0.54)
-    font = load_font(font_path, font_size)
-
-    while text_width(font, label) > canvas_size[0] * 0.86 and font_size > 10:
-        font_size -= 2
-        font = load_font(font_path, font_size)
-
-    bbox = draw.textbbox((0, 0), label, font=font)
-    x = (canvas_size[0] - (bbox[2] - bbox[0])) // 2 - bbox[0]
-    y = (canvas_size[1] - (bbox[3] - bbox[1])) // 2 - bbox[1]
-    draw.text((x, y), label, fill=(0, 0, 0, 255), font=font)
-    return img
+    if not path.exists():
+        raise FileNotFoundError(f"Missing brand mark asset: {path}")
+    return Image.open(path).convert("RGBA")
 
 
 def resolve_brand(make, model):

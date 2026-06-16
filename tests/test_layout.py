@@ -128,16 +128,34 @@ class LayoutTests(unittest.TestCase):
         for line in lines:
             self.assertLessEqual(tool.text_width(font, line), 160)
 
-    def test_generated_brand_marks_share_same_png_canvas(self):
-        sizes = set()
-        modes = set()
+    def test_brand_mark_assets_are_black_transparent_pngs(self):
         for brand in tool.SUPPORTED_BRANDS:
-            img = tool.generate_brand_mark_image(brand, str(FONT_PATH))
-            sizes.add(img.size)
-            modes.add(img.mode)
+            with self.subTest(brand=brand):
+                path = ROOT / "insta" / "brand_marks" / f"{brand}.png"
+                self.assertTrue(path.exists())
+                with Image.open(path) as img:
+                    self.assertEqual(img.size, tool.BRAND_MARK_CANVAS)
+                    self.assertEqual(img.mode, "RGBA")
+                    data = (
+                        img.get_flattened_data()
+                        if hasattr(img, "get_flattened_data")
+                        else img.getdata()
+                    )
+                    pixels = list(data)
 
-        self.assertEqual(sizes, {tool.BRAND_MARK_CANVAS})
-        self.assertEqual(modes, {"RGBA"})
+                transparent = [p for p in pixels if p[3] == 0]
+                visible = [p for p in pixels if p[3] > 0]
+                black = [p for p in visible if p[0] <= 5 and p[1] <= 5 and p[2] <= 5]
+
+                self.assertGreater(len(transparent), 0)
+                self.assertGreater(len(visible), 0)
+                self.assertGreater(len(black), 0)
+                self.assertGreater(len(black) / len(visible), 0.95)
+
+    def test_missing_brand_mark_is_not_synthesized(self):
+        self.assertFalse(hasattr(tool, "generate_brand_mark_image"))
+        with self.assertRaises(FileNotFoundError):
+            tool.load_brand_mark("canon", ROOT / "does-not-exist-brand-assets")
 
 
 if __name__ == "__main__":
