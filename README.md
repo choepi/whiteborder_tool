@@ -5,9 +5,10 @@
 The **White Border Tool** preprocesses images by:
 
 1. Adding a white square canvas.
-2. Fitting the photo above a reserved bottom metadata band, so text never covers the image.
-3. Adding model-only EXIF metadata at the bottom-left.
-4. Adding a normalized black brand mark at the bottom-right for Canon, Nikon, Sony, Fujifilm, and Samsung.
+2. Fitting the photo to the square without adding extra metadata space.
+3. Placing model-only EXIF metadata and the brand mark only in natural white borders.
+4. Using left/right borders for vertical images and the lower border for horizontal images.
+5. Adding a normalized black brand mark for Canon, Nikon, Sony, Fujifilm, and Samsung.
 
 Processed images are read from `insta/01_pre` and saved to `insta/02_post`.
 
@@ -65,6 +66,7 @@ downloaded folder/
 ## Notes
 
 - The original files in `insta/01_pre` are not modified.
+- Square or near-square images with no usable natural border are left without metadata instead of drawing over the photo.
 - Brand mark PNGs are original logo-derived assets normalized to the same canvas size for consistent bottom-right placement.
 - If a recognized brand mark file is missing, the script raises an error instead of generating a replacement.
 

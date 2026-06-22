@@ -8,16 +8,13 @@ from PIL import Image, ImageDraw, ImageFont
 # ===== TUNABLES =====
 OUTPUT_SIDE = 2160  # pick 1080 or 2160; must be same for all outputs
 
-FOOTER_H_FRAC = 0.18
-EDGE_PADDING_FRAC = 0.035
+EDGE_PADDING_FRAC = 0.025
 TEXT_LOGO_GAP_FRAC = 0.035
-BRAND_MARK_W_FRAC = 0.16
-BRAND_MARK_H_FRAC = 0.05
+LANDSCAPE_BRAND_REGION_FRAC = 0.32
+MIN_METADATA_BORDER_PX = 96
 
-MIN_FONT_PX = 20
-MAX_FONT_PX = 30
-LOCK_FONT_PX = 24
-STRICT_LOCK = True
+MIN_FONT_PX = 14
+MAX_FONT_PX = 28
 
 LINE_GAP_RATIO = 0.12
 MIN_LINE_GAP_PX = 1
@@ -59,8 +56,7 @@ def make_square_and_add_metadata(folder_path, output_folder, font_path, DEBUG=DE
         with Image.open(fp) as img:
             img = img.convert("RGB")
             w, h = img.size
-            footer_h = footer_height(OUTPUT_SIDE)
-            image_rect = fit_image_rect(w, h, OUTPUT_SIDE, footer_h)
+            image_rect = fit_image_rect(w, h, OUTPUT_SIDE)
 
             square = Image.new("RGB", (OUTPUT_SIDE, OUTPUT_SIDE), (255, 255, 255))
             resized = img.resize(
@@ -72,19 +68,36 @@ def make_square_and_add_metadata(folder_path, output_folder, font_path, DEBUG=DE
             meta = extract_metadata(fp)
             text = normalize_newlines(format_metadata(meta))
             brand = resolve_brand(meta.get("Make"), meta.get("Model"))
-            text_rect, brand_rect = metadata_regions(OUTPUT_SIDE, footer_h, bool(brand))
+            layout = layout_metadata(
+                text,
+                font_path,
+                OUTPUT_SIDE,
+                image_rect,
+                bool(brand),
+            )
 
             draw = ImageDraw.Draw(square)
-            font, lines, line_h = fit_text(text, font_path, text_rect)
-            draw_text_bottom_left(draw, text_rect, lines, font, line_h)
-            if brand:
-                draw_brand_mark(square, brand, brand_rect)
+            if layout:
+                draw_text_bottom_left(
+                    draw,
+                    layout["text_rect"],
+                    layout["lines"],
+                    layout["font"],
+                    layout["line_h"],
+                )
+                if brand and layout["brand_rect"]:
+                    draw_brand_mark(square, brand, layout["brand_rect"])
 
             if DEBUG:
+                placement = layout["placement"] if layout else "none"
+                text_rect = layout["text_rect"] if layout else None
+                brand_rect = layout["brand_rect"] if layout else None
+                font_size = getattr(layout["font"], "size", None) if layout else None
+                line_count = len(layout["lines"]) if layout else 0
                 print(
-                    f"\n[{fn}] S={OUTPUT_SIDE} footer={footer_h} "
+                    f"\n[{fn}] S={OUTPUT_SIDE} placement={placement} "
                     f"image={image_rect} text={text_rect} brand={brand}:{brand_rect} "
-                    f"font={getattr(font, 'size', LOCK_FONT_PX)} lines={len(lines)}"
+                    f"font={font_size} lines={line_count}"
                 )
 
             out = os.path.join(output_folder, f"{os.path.splitext(fn)[0]}_insta.jpg")
@@ -93,61 +106,107 @@ def make_square_and_add_metadata(folder_path, output_folder, font_path, DEBUG=DE
 
 
 # ===== GEOMETRY =====
-def footer_height(side):
-    return clamp(int(round(side * FOOTER_H_FRAC)), 1, side - 1)
-
-
-def fit_image_rect(width, height, side, footer_h):
+def fit_image_rect(width, height, side):
     """
-    Fit the source image inside the square area above the footer.
-
-    The footer is reserved before the image is resized, so text/logo drawing can
-    never cover real image pixels. This replaces the old orientation-specific
-    border picker that sometimes fell back to drawing a white overlay on top of
-    the photo.
+    Fit the source image into the square canvas without adding extra metadata
+    space. The only white areas are the natural borders created by making the
+    image square.
     """
     if width <= 0 or height <= 0:
         raise ValueError("image dimensions must be positive")
 
-    image_area_h = side - footer_h
-    scale = min(side / float(width), image_area_h / float(height))
+    scale = side / float(max(width, height))
     new_w = max(1, int(round(width * scale)))
     new_h = max(1, int(round(height * scale)))
     x0 = (side - new_w) // 2
-    y0 = (image_area_h - new_h) // 2
+    y0 = (side - new_h) // 2
     return (x0, y0, x0 + new_w, y0 + new_h)
 
 
-def metadata_regions(side, footer_h, include_brand):
-    footer_top = side - footer_h
-    pad = max(12, int(round(side * EDGE_PADDING_FRAC)))
+def natural_border_regions(side, image_rect, include_brand):
+    x0, y0, x1, y1 = image_rect
+    left_w = x0
+    right_w = side - x1
+    top_h = y0
+    bottom_h = side - y1
+    pad = max(10, int(round(side * EDGE_PADDING_FRAC)))
     gap = max(12, int(round(side * TEXT_LOGO_GAP_FRAC)))
 
-    brand_rect = None
-    text_right = side - pad
-    if include_brand:
-        mark_w = max(1, int(round(side * BRAND_MARK_W_FRAC)))
-        mark_h = max(1, int(round(side * BRAND_MARK_H_FRAC)))
-        brand_rect = (side - pad - mark_w, side - pad - mark_h, side - pad, side - pad)
-        text_right = max(pad + 1, brand_rect[0] - gap)
+    if left_w >= MIN_METADATA_BORDER_PX and right_w >= MIN_METADATA_BORDER_PX:
+        text_rect = inset_rect((0, 0, x0, side), pad)
+        brand_rect = inset_rect((x1, 0, side, side), pad) if include_brand else None
+        return {
+            "placement": "vertical-side-borders",
+            "text_rect": text_rect,
+            "brand_container": brand_rect,
+        }
 
-    text_rect = (pad, footer_top + pad, text_right, side - pad)
-    return text_rect, brand_rect
+    if bottom_h >= MIN_METADATA_BORDER_PX:
+        bottom_rect = (0, y1, side, side)
+        inner = inset_rect(bottom_rect, pad)
+        if include_brand:
+            brand_w = max(1, int(round(side * LANDSCAPE_BRAND_REGION_FRAC)))
+            brand_left = max(inner[0] + 1, inner[2] - brand_w)
+            text_right = max(inner[0] + 1, brand_left - gap)
+            brand_rect = (brand_left, inner[1], inner[2], inner[3])
+            text_rect = (inner[0], inner[1], text_right, inner[3])
+        else:
+            brand_rect = None
+            text_rect = inner
+        return {
+            "placement": "horizontal-bottom-border",
+            "text_rect": text_rect,
+            "brand_container": brand_rect,
+        }
+
+    return None
+
+
+def inset_rect(rect, pad):
+    x0, y0, x1, y1 = rect
+    width = x1 - x0
+    height = y1 - y0
+    safe_pad = min(pad, max(0, (width - 1) // 2), max(0, (height - 1) // 2))
+    return (x0 + safe_pad, y0 + safe_pad, x1 - safe_pad, y1 - safe_pad)
 
 
 # ===== TEXT LAYOUT =====
+def layout_metadata(text, font_path, side, image_rect, include_brand):
+    regions = natural_border_regions(side, image_rect, include_brand)
+    if not regions:
+        return None
+
+    font, lines, line_h = fit_text(text, font_path, regions["text_rect"])
+    text_block_h = line_h * len(lines)
+    brand_rect = None
+    if include_brand and regions["brand_container"]:
+        brand_rect = fit_brand_rect(regions["brand_container"], text_block_h)
+
+    return {
+        "placement": regions["placement"],
+        "text_rect": regions["text_rect"],
+        "brand_rect": brand_rect,
+        "font": font,
+        "lines": lines,
+        "line_h": line_h,
+    }
+
+
 def fit_text(text, font_path, rect):
     inner_w = max(1, rect[2] - rect[0])
     inner_h = max(1, rect[3] - rect[1])
-    locked_size = clamp(int(LOCK_FONT_PX), MIN_FONT_PX, MAX_FONT_PX)
+    raw_lines = text.split("\n")
 
-    font = load_font(font_path, locked_size)
-    lines = wrap_text_preserve_newlines(text, font, inner_w)
-    line_h = uniform_line_height(font)
-    if STRICT_LOCK and line_h * len(lines) <= inner_h:
-        return font, lines, line_h
+    for size in range(MAX_FONT_PX, MIN_FONT_PX - 1, -1):
+        font = load_font(font_path, size)
+        line_h = uniform_line_height(font)
+        if (
+            line_h * len(raw_lines) <= inner_h
+            and all(text_width(font, line) <= inner_w for line in raw_lines)
+        ):
+            return font, raw_lines, line_h
 
-    for size in range(min(locked_size, MAX_FONT_PX), MIN_FONT_PX - 1, -1):
+    for size in range(MAX_FONT_PX, MIN_FONT_PX - 1, -1):
         font = load_font(font_path, size)
         lines = wrap_text_preserve_newlines(text, font, inner_w)
         line_h = uniform_line_height(font)
@@ -159,6 +218,22 @@ def fit_text(text, font_path, rect):
     max_lines = max(1, inner_h // line_h)
     lines = wrap_text_preserve_newlines(text, font, inner_w, max_lines=max_lines)
     return font, lines, line_h
+
+
+def fit_brand_rect(container, target_h):
+    x0, y0, x1, y1 = container
+    max_w = max(1, x1 - x0)
+    max_h = max(1, min(y1 - y0, target_h))
+    aspect = BRAND_MARK_CANVAS[0] / float(BRAND_MARK_CANVAS[1])
+
+    if max_w / float(max_h) < aspect:
+        mark_w = max_w
+        mark_h = max(1, int(round(mark_w / aspect)))
+    else:
+        mark_h = max_h
+        mark_w = max(1, int(round(mark_h * aspect)))
+
+    return (x1 - mark_w, y1 - mark_h, x1, y1)
 
 
 def draw_text_bottom_left(draw, rect, lines, font, line_h):

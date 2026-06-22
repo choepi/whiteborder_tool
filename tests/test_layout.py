@@ -14,41 +14,97 @@ FONT_PATH = ROOT / "insta" / "font" / "07558_CenturyGothic.ttf"
 
 
 class LayoutTests(unittest.TestCase):
-    def test_image_fit_reserves_footer_for_common_orientations(self):
+    def test_image_fit_uses_only_natural_square_borders(self):
         side = 2160
-        footer_h = tool.footer_height(side)
-        footer_top = side - footer_h
 
-        for width, height in [(6000, 4000), (4000, 6000), (4000, 4000)]:
+        cases = [
+            ((4000, 6000), (360, 0, 1800, 2160)),
+            ((6000, 4000), (0, 360, 2160, 1800)),
+            ((4000, 4000), (0, 0, 2160, 2160)),
+        ]
+        for (width, height), expected in cases:
             with self.subTest(width=width, height=height):
-                rect = tool.fit_image_rect(width, height, side, footer_h)
-                self.assertGreaterEqual(rect[0], 0)
-                self.assertGreaterEqual(rect[1], 0)
-                self.assertLessEqual(rect[2], side)
-                self.assertLessEqual(rect[3], footer_top)
+                self.assertEqual(tool.fit_image_rect(width, height, side), expected)
 
-    def test_metadata_regions_are_bottom_left_and_bottom_right(self):
+    def test_vertical_images_use_left_and_right_borders(self):
         side = 2160
-        footer_h = tool.footer_height(side)
-        footer_top = side - footer_h
+        image_rect = tool.fit_image_rect(4000, 6000, side)
+        layout = tool.layout_metadata(
+            self.sample_metadata_text(),
+            str(FONT_PATH),
+            side,
+            image_rect,
+            include_brand=True,
+        )
 
-        text_rect, brand_rect = tool.metadata_regions(side, footer_h, include_brand=True)
-        brand_w = brand_rect[2] - brand_rect[0]
-        brand_h = brand_rect[3] - brand_rect[1]
+        self.assertEqual(layout["placement"], "vertical-side-borders")
+        self.assertLessEqual(layout["text_rect"][2], image_rect[0])
+        self.assertGreaterEqual(layout["brand_rect"][0], image_rect[2])
+        self.assertEqual(layout["brand_rect"][3], layout["text_rect"][3])
 
-        self.assertGreaterEqual(text_rect[0], 0)
-        self.assertGreaterEqual(text_rect[1], footer_top)
-        self.assertEqual(text_rect[3], brand_rect[3])
-        self.assertLess(text_rect[2], brand_rect[0])
-        self.assertEqual(brand_rect[2], side - text_rect[0])
-        self.assertEqual(brand_w, int(round(side * tool.BRAND_MARK_W_FRAC)))
-        self.assertEqual(brand_h, int(round(side * tool.BRAND_MARK_H_FRAC)))
-        self.assertLess(brand_w, int(round(side * 0.22)))
-        self.assertLess(brand_h, int(round(side * 0.065)))
+    def test_horizontal_images_use_lower_border(self):
+        side = 2160
+        image_rect = tool.fit_image_rect(6000, 4000, side)
+        layout = tool.layout_metadata(
+            self.sample_metadata_text(),
+            str(FONT_PATH),
+            side,
+            image_rect,
+            include_brand=True,
+        )
+
+        self.assertEqual(layout["placement"], "horizontal-bottom-border")
+        self.assertGreaterEqual(layout["text_rect"][1], image_rect[3])
+        self.assertGreaterEqual(layout["brand_rect"][1], image_rect[3])
+        self.assertEqual(layout["brand_rect"][3], layout["text_rect"][3])
+
+    def test_square_images_do_not_get_synthetic_metadata_border(self):
+        side = 2160
+        image_rect = tool.fit_image_rect(4000, 4000, side)
+
+        self.assertIsNone(tool.natural_border_regions(side, image_rect, True))
+        self.assertIsNone(
+            tool.layout_metadata(
+                self.sample_metadata_text(),
+                str(FONT_PATH),
+                side,
+                image_rect,
+                include_brand=True,
+            )
+        )
 
     def test_output_canvas_is_square(self):
         self.assertEqual(tool.OUTPUT_SIDE, 2160)
         self.assertEqual((tool.OUTPUT_SIDE, tool.OUTPUT_SIDE), (2160, 2160))
+
+    def test_brand_scales_from_fitted_metadata_height(self):
+        side = 2160
+        image_rect = tool.fit_image_rect(6000, 4000, side)
+        layout = tool.layout_metadata(
+            self.sample_metadata_text(),
+            str(FONT_PATH),
+            side,
+            image_rect,
+            include_brand=True,
+        )
+        text_h = layout["line_h"] * len(layout["lines"])
+        brand_h = layout["brand_rect"][3] - layout["brand_rect"][1]
+
+        self.assertLessEqual(brand_h, text_h)
+        self.assertGreaterEqual(layout["font"].size, tool.MIN_FONT_PX)
+        self.assertLessEqual(layout["font"].size, tool.MAX_FONT_PX)
+
+    @staticmethod
+    def sample_metadata_text():
+        return "\n".join(
+            [
+                "Model: ILCE-7RM5",
+                "ISO: 200",
+                "Aperture: f/2.8",
+                "Shutter Speed: 1/250s",
+                "Focal Length: 85mm",
+            ]
+        )
 
     def test_format_metadata_uses_model_only(self):
         text = tool.format_metadata(
@@ -137,6 +193,13 @@ class LayoutTests(unittest.TestCase):
         self.assertGreater(len(lines), 1)
         for line in lines:
             self.assertLessEqual(tool.text_width(font, line), 160)
+
+    def test_fit_text_shrinks_before_wrapping_metadata_lines(self):
+        text = "Shutter Speed: 1/250s\nFocal Length: 200mm"
+        font, lines, _ = tool.fit_text(text, str(FONT_PATH), (0, 0, 180, 500))
+
+        self.assertEqual(lines, text.split("\n"))
+        self.assertLess(font.size, tool.MAX_FONT_PX)
 
     def test_brand_mark_assets_are_black_transparent_pngs(self):
         for brand in tool.SUPPORTED_BRANDS:
