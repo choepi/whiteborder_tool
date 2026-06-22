@@ -91,18 +91,39 @@ class LayoutTests(unittest.TestCase):
         brand_h = layout["brand_rect"][3] - layout["brand_rect"][1]
 
         self.assertLessEqual(brand_h, text_h)
+        self.assertLessEqual(
+            layout["brand_rect"][2] - layout["brand_rect"][0],
+            int(round(side * tool.MAX_BRAND_MARK_W_FRAC)),
+        )
+        self.assertLessEqual(brand_h, int(round(side * tool.MAX_BRAND_MARK_H_FRAC)))
         self.assertGreaterEqual(layout["font"].size, tool.MIN_FONT_PX)
         self.assertLessEqual(layout["font"].size, tool.MAX_FONT_PX)
+
+    def test_brand_cap_matches_fujifilm_side_border_scale(self):
+        side = 2160
+        image_rect = tool.fit_image_rect(4000, 6000, side)
+        layout = tool.layout_metadata(
+            self.sample_metadata_text(),
+            str(FONT_PATH),
+            side,
+            image_rect,
+            include_brand=True,
+        )
+        brand_w = layout["brand_rect"][2] - layout["brand_rect"][0]
+        brand_h = layout["brand_rect"][3] - layout["brand_rect"][1]
+
+        self.assertLessEqual(brand_w, 253)
+        self.assertLessEqual(brand_h, 76)
 
     @staticmethod
     def sample_metadata_text():
         return "\n".join(
             [
                 "Model: ILCE-7RM5",
-                "ISO: 200",
-                "Aperture: f/2.8",
-                "Shutter Speed: 1/250s",
-                "Focal Length: 85mm",
+                "ISO 200",
+                "f/2.8",
+                "1/250s",
+                "85mm",
             ]
         )
 
@@ -119,7 +140,14 @@ class LayoutTests(unittest.TestCase):
         )
 
         self.assertTrue(text.startswith("Model: EOS R5\n"))
+        self.assertIn("ISO 100\n", text)
+        self.assertIn("f/2.8\n", text)
+        self.assertIn("1/250s\n", text)
+        self.assertTrue(text.endswith("50mm"))
         self.assertNotIn("Camera:", text)
+        self.assertNotIn("Aperture:", text)
+        self.assertNotIn("Shutter Speed:", text)
+        self.assertNotIn("Focal Length:", text)
         self.assertNotIn("Canon EOS R5", text)
 
     def test_brand_resolution_uses_make_or_model(self):
@@ -194,12 +222,19 @@ class LayoutTests(unittest.TestCase):
         for line in lines:
             self.assertLessEqual(tool.text_width(font, line), 160)
 
-    def test_fit_text_shrinks_before_wrapping_metadata_lines(self):
+    def test_fit_text_shrinks_without_wrapping_metadata_lines(self):
         text = "Shutter Speed: 1/250s\nFocal Length: 200mm"
         font, lines, _ = tool.fit_text(text, str(FONT_PATH), (0, 0, 180, 500))
 
         self.assertEqual(lines, text.split("\n"))
         self.assertLess(font.size, tool.MAX_FONT_PX)
+
+    def test_fit_text_truncates_instead_of_wrapping_when_too_narrow(self):
+        text = "Model: THISISANUNUSUALLYLONGMODELNAMEWITHOUTSPACES\nISO 200"
+        _, lines, _ = tool.fit_text(text, str(FONT_PATH), (0, 0, 90, 500))
+
+        self.assertEqual(len(lines), 2)
+        self.assertTrue(lines[0].endswith("..."))
 
     def test_brand_mark_assets_are_black_transparent_pngs(self):
         for brand in tool.SUPPORTED_BRANDS:

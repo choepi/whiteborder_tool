@@ -12,6 +12,8 @@ EDGE_PADDING_FRAC = 0.025
 TEXT_LOGO_GAP_FRAC = 0.035
 LANDSCAPE_BRAND_REGION_FRAC = 0.32
 MIN_METADATA_BORDER_PX = 96
+MAX_BRAND_MARK_W_FRAC = 0.117
+MAX_BRAND_MARK_H_FRAC = 0.035
 
 MIN_FONT_PX = 14
 MAX_FONT_PX = 28
@@ -206,24 +208,21 @@ def fit_text(text, font_path, rect):
         ):
             return font, raw_lines, line_h
 
-    for size in range(MAX_FONT_PX, MIN_FONT_PX - 1, -1):
-        font = load_font(font_path, size)
-        lines = wrap_text_preserve_newlines(text, font, inner_w)
-        line_h = uniform_line_height(font)
-        if line_h * len(lines) <= inner_h:
-            return font, lines, line_h
-
     font = load_font(font_path, MIN_FONT_PX)
     line_h = uniform_line_height(font)
     max_lines = max(1, inner_h // line_h)
-    lines = wrap_text_preserve_newlines(text, font, inner_w, max_lines=max_lines)
+    lines = [
+        truncate_text_to_width(line, font, inner_w)
+        for line in raw_lines[:max_lines]
+    ]
     return font, lines, line_h
 
 
 def fit_brand_rect(container, target_h):
     x0, y0, x1, y1 = container
-    max_w = max(1, x1 - x0)
-    max_h = max(1, min(y1 - y0, target_h))
+    side = max(x1, y1)
+    max_w = max(1, min(x1 - x0, int(round(side * MAX_BRAND_MARK_W_FRAC))))
+    max_h = max(1, min(y1 - y0, target_h, int(round(side * MAX_BRAND_MARK_H_FRAC))))
     aspect = BRAND_MARK_CANVAS[0] / float(BRAND_MARK_CANVAS[1])
 
     if max_w / float(max_h) < aspect:
@@ -300,6 +299,20 @@ def split_token_to_width(token, font, max_w):
     if cur:
         chunks.append(cur)
     return chunks
+
+
+def truncate_text_to_width(text, font, max_w):
+    if text_width(font, text) <= max_w:
+        return text
+
+    suffix = "..."
+    if text_width(font, suffix) > max_w:
+        return ""
+
+    out = text
+    while out and text_width(font, out + suffix) > max_w:
+        out = out[:-1]
+    return out + suffix
 
 
 def text_width(font, text):
@@ -479,10 +492,10 @@ def format_focal_length(value):
 def format_metadata(md):
     return (
         f"Model: {md.get('Model', 'Unknown')}\n"
-        f"ISO: {md.get('ISO', 'Unknown')}\n"
-        f"Aperture: {md.get('Aperture', 'Unknown')}\n"
-        f"Shutter Speed: {md.get('Shutter Speed', 'Unknown')}\n"
-        f"Focal Length: {md.get('Focal Length', 'Unknown')}"
+        f"ISO {md.get('ISO', 'Unknown')}\n"
+        f"{md.get('Aperture', 'Unknown')}\n"
+        f"{md.get('Shutter Speed', 'Unknown')}\n"
+        f"{md.get('Focal Length', 'Unknown')}"
     )
 
 
