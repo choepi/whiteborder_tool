@@ -99,6 +99,29 @@ class LayoutTests(unittest.TestCase):
         self.assertGreaterEqual(layout["font"].size, tool.MIN_FONT_PX)
         self.assertLessEqual(layout["font"].size, tool.MAX_FONT_PX)
 
+    def test_brand_logo_toggle_removes_logo_region(self):
+        side = 2160
+        image_rect = tool.fit_image_rect(6000, 4000, side)
+        with_brand = tool.layout_metadata(
+            self.sample_metadata_text(),
+            str(FONT_PATH),
+            side,
+            image_rect,
+            include_brand=True,
+        )
+        without_brand = tool.layout_metadata(
+            self.sample_metadata_text(),
+            str(FONT_PATH),
+            side,
+            image_rect,
+            include_brand=False,
+        )
+
+        self.assertTrue(tool.SHOW_BRAND_MARK)
+        self.assertIsNotNone(with_brand["brand_rect"])
+        self.assertIsNone(without_brand["brand_rect"])
+        self.assertGreater(without_brand["text_rect"][2], with_brand["text_rect"][2])
+
     def test_brand_cap_matches_fujifilm_side_border_scale(self):
         side = 2160
         image_rect = tool.fit_image_rect(4000, 6000, side)

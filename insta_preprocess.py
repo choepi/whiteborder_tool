@@ -7,6 +7,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 # ===== TUNABLES =====
 OUTPUT_SIDE = 2160  # pick 1080 or 2160; must be same for all outputs
+SHOW_BRAND_MARK = True
 
 EDGE_PADDING_FRAC = 0.025
 TEXT_LOGO_GAP_FRAC = 0.035
@@ -41,7 +42,13 @@ except AttributeError:
 
 
 # ===== CORE =====
-def make_square_and_add_metadata(folder_path, output_folder, font_path, DEBUG=DEBUG):
+def make_square_and_add_metadata(
+    folder_path,
+    output_folder,
+    font_path,
+    DEBUG=DEBUG,
+    show_brand_mark=SHOW_BRAND_MARK,
+):
     os.makedirs(output_folder, exist_ok=True)
 
     files = [
@@ -69,7 +76,11 @@ def make_square_and_add_metadata(folder_path, output_folder, font_path, DEBUG=DE
 
             meta = extract_metadata(fp)
             text = normalize_newlines(format_metadata(meta))
-            brand = resolve_brand(meta.get("Make"), meta.get("Model"))
+            brand = (
+                resolve_brand(meta.get("Make"), meta.get("Model"))
+                if show_brand_mark
+                else None
+            )
             layout = layout_metadata(
                 text,
                 font_path,

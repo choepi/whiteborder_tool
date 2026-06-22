@@ -44,6 +44,10 @@ downloaded folder/
 2. Run `insta_preprocess.exe`, or run `insta_preprocess.py` with Python.
 3. Processed square images are saved in `insta/02_post`.
 
+### Logo Toggle
+
+Set `SHOW_BRAND_MARK = False` near the top of `insta_preprocess.py` to hide brand logos while keeping the metadata.
+
 ---
 
 ## Troubleshooting
