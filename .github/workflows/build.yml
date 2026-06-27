@@ -17,8 +17,10 @@ jobs:
         include:
           - os: windows-latest
             artifact: whiteborder-windows.exe
-          - os: macos-latest
-            artifact: whiteborder-macos
+          - os: macos-13           # Intel x86_64 — runs on Intel + Apple Silicon via Rosetta
+            artifact: whiteborder-macos-intel
+          - os: macos-latest       # Apple Silicon arm64
+            artifact: whiteborder-macos-arm64
           - os: ubuntu-latest
             artifact: whiteborder-linux
 

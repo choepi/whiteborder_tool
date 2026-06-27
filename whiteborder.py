@@ -37,11 +37,20 @@ BRAND_MARK_CANVAS = (600, 180)
 DEFAULT_FONT = str(_HERE / "font" / "07558_CenturyGothic.ttf")
 
 SUPPORTED_BRANDS = {
-    "canon":    ("CANON",    ("canon", "eos")),
-    "nikon":    ("NIKON",    ("nikon", "nikkor")),
-    "sony":     ("SONY",     ("sony", "ilce", "dslr-a", "zv-")),
-    "fujifilm": ("FUJIFILM", ("fujifilm", "fuji", "x-t", "x-pro", "x100", "gfx")),
-    "samsung":  ("SAMSUNG",  ("samsung", "galaxy")),
+    "apple":      ("APPLE",      ("apple", "iphone", "ipad")),
+    "canon":      ("CANON",      ("canon", "eos")),
+    "dji":        ("DJI",        ("dji", "mavic", "osmo", "phantom", "air 2", "mini 2")),
+    "fujifilm":   ("FUJIFILM",   ("fujifilm", "fuji", "x-t", "x-pro", "x100", "gfx")),
+    "google":     ("GOOGLE",     ("google", "pixel")),
+    "gopro":      ("GOPRO",      ("gopro", "hero")),
+    "hasselblad": ("HASSELBLAD", ("hasselblad",)),
+    "leica":      ("LEICA",      ("leica",)),
+    "nikon":      ("NIKON",      ("nikon", "nikkor")),
+    "olympus":    ("OLYMPUS",    ("olympus", "om-system", "om system", "e-m", "omd")),
+    "panasonic":  ("PANASONIC",  ("panasonic", "lumix", "dc-s", "dc-g", "dc-gh")),
+    "ricoh":      ("RICOH",      ("ricoh", "pentax", "gr iii", "gr3")),
+    "samsung":    ("SAMSUNG",    ("samsung", "galaxy")),
+    "sony":       ("SONY",       ("sony", "ilce", "dslr-a", "zv-", "ilx")),
 }
 
 try:

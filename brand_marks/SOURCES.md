@@ -6,11 +6,24 @@ normalized to `600x180` for consistent bottom-right placement.
 
 | Brand | Source page | Original SVG | Rendered thumbnail used |
 | --- | --- | --- | --- |
-| Canon | https://commons.wikimedia.org/wiki/File:Canon_wordmark.svg | https://upload.wikimedia.org/wikipedia/commons/0/0a/Canon_wordmark.svg | https://upload.wikimedia.org/wikipedia/commons/thumb/0/0a/Canon_wordmark.svg/3840px-Canon_wordmark.svg.png |
-| Nikon | https://commons.wikimedia.org/wiki/File:Nikon_Logo.svg | https://upload.wikimedia.org/wikipedia/commons/f/f3/Nikon_Logo.svg | https://upload.wikimedia.org/wikipedia/commons/thumb/f/f3/Nikon_Logo.svg/3840px-Nikon_Logo.svg.png |
-| Sony | https://commons.wikimedia.org/wiki/File:Sony_logo.svg | https://upload.wikimedia.org/wikipedia/commons/c/ca/Sony_logo.svg | https://upload.wikimedia.org/wikipedia/commons/thumb/c/ca/Sony_logo.svg/3840px-Sony_logo.svg.png |
-| Fujifilm | https://commons.wikimedia.org/wiki/File:Fujifilm_logo.svg | https://upload.wikimedia.org/wikipedia/commons/a/a1/Fujifilm_logo.svg | https://upload.wikimedia.org/wikipedia/commons/thumb/a/a1/Fujifilm_logo.svg/1280px-Fujifilm_logo.svg.png |
-| Samsung | https://commons.wikimedia.org/wiki/File:Samsung_Black_icon.svg | https://upload.wikimedia.org/wikipedia/commons/b/b7/Samsung_Black_icon.svg | https://upload.wikimedia.org/wikipedia/commons/thumb/b/b7/Samsung_Black_icon.svg/1280px-Samsung_Black_icon.svg.png |
+| Brand | Mark type | Source |
+| --- | --- | --- |
+| Apple | Wikimedia SVG | https://commons.wikimedia.org/wiki/File:Apple_logo_black.svg |
+| Canon | Wikimedia SVG | https://commons.wikimedia.org/wiki/File:Canon_wordmark.svg |
+| DJI | Text (Century Gothic) | — |
+| Fujifilm | Wikimedia SVG | https://commons.wikimedia.org/wiki/File:Fujifilm_logo.svg |
+| Google | Wikimedia SVG | https://commons.wikimedia.org/wiki/File:Google_2015_logo.svg |
+| GoPro | Text (Century Gothic) | — |
+| Hasselblad | Text (Century Gothic) | — |
+| Leica | Text (Century Gothic) | — |
+| Nikon | Wikimedia SVG | https://commons.wikimedia.org/wiki/File:Nikon_Logo.svg |
+| Olympus | Text (Century Gothic) | — |
+| Panasonic | Text (Century Gothic) | — |
+| Ricoh | Text (Century Gothic) | — |
+| Samsung | Wikimedia SVG | https://commons.wikimedia.org/wiki/File:Samsung_Black_icon.svg |
+| Sony | Wikimedia SVG | https://commons.wikimedia.org/wiki/File:Sony_logo.svg |
 
 Trademark restrictions may still apply to logo use even when a source page
 describes a file as public domain or below the threshold of originality.
+Text-based marks use the bundled Century Gothic font; they approximate the
+brand wordmark style but are not derived from official logo assets.

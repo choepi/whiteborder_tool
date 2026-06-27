@@ -17,12 +17,17 @@ Grab the latest pre-built binary from the [Releases](../../releases) page:
 | Platform | File |
 |----------|------|
 | Windows  | `whiteborder-windows.exe` |
-| macOS    | `whiteborder-macos` |
+| macOS — Apple Silicon (M1/M2/M3) | `whiteborder-macos-arm64` |
+| macOS — Intel | `whiteborder-macos-intel` |
 | Linux    | `whiteborder-linux` |
 
 Place the binary in a folder alongside `input/` and `output/` directories, then run it.
 
-> **macOS note:** The binary is unsigned. Right-click → Open the first time to bypass Gatekeeper.
+> **macOS note:** The binary is unsigned. On first launch, macOS will block it.
+> Fix: right-click the file → **Open** → **Open** in the dialog.
+> Or run once in Terminal: `xattr -d com.apple.quarantine whiteborder-macos-*`
+>
+> On macOS/Linux, make it executable first: `chmod +x whiteborder-macos-*`
 
 ---
 
