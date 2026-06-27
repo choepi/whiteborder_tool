@@ -7,6 +7,7 @@ Output: square JPEGs with white borders and camera metadata.
 
 import argparse
 import os
+import sys
 from fractions import Fraction
 from pathlib import Path
 
@@ -14,7 +15,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 # ── defaults ──────────────────────────────────────────────────────────────────
 OUTPUT_SIDE = 2160
-SHOW_BRAND_MARK = True
+SHOW_BRAND_MARK = False
 
 EDGE_PADDING_FRAC = 0.025
 TEXT_LOGO_GAP_FRAC = 0.035
@@ -29,7 +30,8 @@ MIN_LINE_GAP_PX = 1
 TEXT_COLOR = (0, 0, 0)
 TREAT_SLASH_N_AS_NEWLINE = True
 
-_HERE = Path(__file__).parent
+# When frozen by PyInstaller --onefile, bundled assets live in sys._MEIPASS.
+_HERE = Path(getattr(sys, "_MEIPASS", Path(__file__).parent))
 BRAND_MARK_DIR = _HERE / "brand_marks"
 BRAND_MARK_CANVAS = (600, 180)
 DEFAULT_FONT = str(_HERE / "font" / "07558_CenturyGothic.ttf")

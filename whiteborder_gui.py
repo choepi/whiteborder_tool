@@ -14,7 +14,8 @@ from tkinter import filedialog, messagebox, ttk
 
 import whiteborder as wb
 
-_HERE = Path(__file__).parent
+# When frozen, put input/output next to the executable, not in the temp dir.
+_HERE = Path(sys.executable).parent if getattr(sys, "frozen", False) else Path(__file__).parent
 _BRANDS = list(wb.SUPPORTED_BRANDS.keys())
 _BRAND_LABELS = {k: v[0] for k, v in wb.SUPPORTED_BRANDS.items()}
 

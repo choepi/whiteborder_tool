@@ -10,9 +10,25 @@ Add white borders and EXIF metadata overlays to photos for square Instagram expo
 
 ---
 
-## Setup
+## Download (no Python needed)
 
-**Python 3.8+ required.** Works on macOS, Windows, and Linux.
+Grab the latest pre-built binary from the [Releases](../../releases) page:
+
+| Platform | File |
+|----------|------|
+| Windows  | `whiteborder-windows.exe` |
+| macOS    | `whiteborder-macos` |
+| Linux    | `whiteborder-linux` |
+
+Place the binary in a folder alongside `input/` and `output/` directories, then run it.
+
+> **macOS note:** The binary is unsigned. Right-click → Open the first time to bypass Gatekeeper.
+
+---
+
+## Setup (Python)
+
+**Python 3.8+ required.**
 
 ```bash
 pip install -r requirements.txt
@@ -29,8 +45,6 @@ whiteborder_tool/
 ├── input/               # Drop your photos here
 └── output/              # Processed images appear here
 ```
-
-Create `input/` and `output/` next to the scripts, or pass any folders as arguments.
 
 ---
 

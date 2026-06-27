@@ -117,7 +117,7 @@ class LayoutTests(unittest.TestCase):
             include_brand=False,
         )
 
-        self.assertTrue(tool.SHOW_BRAND_MARK)
+        self.assertFalse(tool.SHOW_BRAND_MARK)
         self.assertIsNotNone(with_brand["brand_rect"])
         self.assertIsNone(without_brand["brand_rect"])
         self.assertGreater(without_brand["text_rect"][2], with_brand["text_rect"][2])
