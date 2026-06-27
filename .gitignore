@@ -1,7 +1,7 @@
-input/
-output/
-insta/01_pre/
-insta/02_post/
+input/*
+!input/.gitkeep
+output/*
+!output/.gitkeep
 
 __pycache__/
 *.py[cod]

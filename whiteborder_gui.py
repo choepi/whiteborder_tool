@@ -14,6 +14,7 @@ from tkinter import filedialog, messagebox, ttk
 
 import whiteborder as wb
 
+_HERE = Path(__file__).parent
 _BRANDS = list(wb.SUPPORTED_BRANDS.keys())
 _BRAND_LABELS = {k: v[0] for k, v in wb.SUPPORTED_BRANDS.items()}
 
@@ -25,8 +26,8 @@ class App(tk.Tk):
         self.resizable(False, False)
         self._queue = queue.Queue()
 
-        self._input = tk.StringVar(value=str(Path.cwd() / "input"))
-        self._output = tk.StringVar(value=str(Path.cwd() / "output"))
+        self._input = tk.StringVar(value=str(_HERE / "input"))
+        self._output = tk.StringVar(value=str(_HERE / "output"))
         self._size = tk.IntVar(value=2160)
         self._show_brand = tk.BooleanVar(value=True)
         self._brand_vars = {b: tk.BooleanVar(value=True) for b in _BRANDS}
