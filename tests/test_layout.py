@@ -7,10 +7,10 @@ from PIL import Image
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-import insta_preprocess as tool
+import whiteborder as tool
 
 
-FONT_PATH = ROOT / "insta" / "font" / "07558_CenturyGothic.ttf"
+FONT_PATH = ROOT / "font" / "07558_CenturyGothic.ttf"
 
 
 class LayoutTests(unittest.TestCase):
@@ -262,7 +262,7 @@ class LayoutTests(unittest.TestCase):
     def test_brand_mark_assets_are_black_transparent_pngs(self):
         for brand in tool.SUPPORTED_BRANDS:
             with self.subTest(brand=brand):
-                path = ROOT / "insta" / "brand_marks" / f"{brand}.png"
+                path = ROOT / "brand_marks" / f"{brand}.png"
                 self.assertTrue(path.exists())
                 with Image.open(path) as img:
                     self.assertEqual(img.size, tool.BRAND_MARK_CANVAS)
