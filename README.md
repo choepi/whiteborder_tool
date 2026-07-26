@@ -10,6 +10,16 @@ Add white borders and EXIF metadata overlays to photos for square Instagram expo
 
 ---
 
+## Use it in the browser — no install
+
+**[choepi.github.io/whiteborder_tool](https://choepi.github.io/whiteborder_tool/)**
+
+The web app (`/docs`) is a full port of the same layout engine to Canvas/JS. Drop photos
+in, everything is processed locally in your browser via `<canvas>` — nothing is uploaded
+anywhere — and you download the results directly, individually or as a zip.
+
+---
+
 ## Download (no Python needed)
 
 Grab the latest pre-built binary from the [Releases](../../releases) page:

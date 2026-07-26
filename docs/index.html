@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>White Border — square borders &amp; EXIF overlays, in your browser</title>
+  <meta name="description" content="Add white borders and camera EXIF overlays to your photos for square Instagram exports. Runs entirely in your browser — no upload, no install." />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%230b0b12'/%3E%3Crect x='18' y='18' width='64' height='64' rx='6' fill='none' stroke='%23f4f4f8' stroke-width='6'/%3E%3Ccircle cx='50' cy='50' r='9' fill='%2384f7c8'/%3E%3C/svg%3E" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="bg-mesh" aria-hidden="true">
+    <span class="blob blob-a"></span>
+    <span class="blob blob-b"></span>
+    <span class="blob blob-c"></span>
+    <span class="grain"></span>
+  </div>
+
+  <header class="site-header">
+    <a class="brand" href="#top">
+      <span class="brand-mark" aria-hidden="true"></span>
+      White Border
+    </a>
+    <nav class="site-nav">
+      <a href="https://github.com/choepi/whiteborder_tool" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://github.com/choepi/whiteborder_tool/releases" target="_blank" rel="noopener">Desktop app</a>
+    </nav>
+  </header>
+
+  <main id="top">
+    <section class="hero">
+      <span class="eyebrow">100% client-side — nothing ever leaves your device</span>
+      <h1>Square borders, done right<br /><span class="text-gradient">in the browser.</span></h1>
+      <p class="hero-sub">
+        Drop your photos in. Get back square exports with a natural white border,
+        camera metadata, and optional brand marks — ready for Instagram. No installs,
+        no accounts, no uploads.
+      </p>
+      <div class="hero-stats">
+        <div><strong>0</strong><span>bytes uploaded</span></div>
+        <div><strong>14</strong><span>camera brands</span></div>
+        <div><strong>2160px</strong><span>max export size</span></div>
+      </div>
+    </section>
+
+    <section class="app-shell">
+      <div class="panel dropzone-panel">
+        <div class="panel-head">
+          <h2>1. Add photos</h2>
+          <span class="panel-hint">JPEG &amp; PNG</span>
+        </div>
+
+        <div id="dropzone" class="dropzone" tabindex="0" role="button" aria-label="Add photos">
+          <input id="fileInput" type="file" accept="image/jpeg,image/png" multiple hidden />
+          <div class="dropzone-icon" aria-hidden="true">
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="none"><path d="M12 16V4M12 4L7 9M12 4l5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+          <p><strong>Drag &amp; drop</strong> photos here, or click to browse</p>
+          <p id="emptyState" class="dropzone-empty">Nothing loaded yet</p>
+        </div>
+
+        <div class="file-list-head">
+          <span id="fileCount"></span>
+          <button id="clearBtn" type="button" class="btn btn-small btn-ghost" hidden>Clear all</button>
+        </div>
+        <ul id="fileList" class="file-list"></ul>
+      </div>
+
+      <div class="panel options-panel">
+        <div class="panel-head">
+          <h2>2. Options</h2>
+        </div>
+
+        <div class="option-group">
+          <span class="option-label">Output size</span>
+          <div class="segmented">
+            <label class="segment"><input type="radio" name="size" value="1080" /> <span>1080 px</span></label>
+            <label class="segment"><input type="radio" name="size" value="2160" checked /> <span>2160 px <em>recommended</em></span></label>
+          </div>
+        </div>
+
+        <div class="option-group">
+          <label class="switch-row">
+            <span class="option-label">Show brand marks</span>
+            <span class="switch">
+              <input id="brandToggle" type="checkbox" checked />
+              <span class="switch-track"><span class="switch-thumb"></span></span>
+            </span>
+          </label>
+          <div id="brandGrid" class="chip-grid"></div>
+        </div>
+
+        <div class="option-note">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.6"/><path d="M12 8v.01M12 11v5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+          Camera model is read from each photo's EXIF data and matched to a brand automatically.
+        </div>
+      </div>
+    </section>
+
+    <section class="actions">
+      <button id="processBtn" class="btn btn-primary" disabled>Process images</button>
+      <div id="progressWrap" class="progress-wrap" hidden>
+        <div class="progress-track"><div id="progressBar" class="progress-bar"></div></div>
+        <span id="progressLabel" class="progress-label"></span>
+      </div>
+    </section>
+
+    <section id="resultsSection" class="results" hidden>
+      <div class="panel-head results-head">
+        <h2>Results</h2>
+        <button id="downloadAllBtn" class="btn btn-small btn-ghost" hidden>Download all (.zip)</button>
+      </div>
+      <div id="resultsGrid" class="results-grid"></div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p>Built by <strong>Choepi</strong>. Processing happens locally via the Canvas API — your photos are never sent anywhere.</p>
+    <p><a href="https://github.com/choepi/whiteborder_tool" target="_blank" rel="noopener">Source on GitHub</a> · <a href="https://github.com/choepi/whiteborder_tool/releases" target="_blank" rel="noopener">Desktop app (Win/Mac/Linux)</a></p>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/exifr/dist/full.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <script src="app.js"></script>
+  <script src="ui.js"></script>
+</body>
+</html>
